@@ -1,0 +1,140 @@
+"""
+API endpoints for BeatCanvas music generation.
+"""
+
+import os
+import uuid
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
+from app.models import GenerateRequest
+from app.services.openai_service import OpenAIService
+from app.services.midi_service import MidiService
+from app.services.audio_service import AudioService
+from app.config import settings
+
+
+router = APIRouter()
+
+
+@router.post("/generate")
+async def generate_music(
+    request: GenerateRequest,
+    background_tasks: BackgroundTasks
+) -> FileResponse:
+    """
+    Generate music from genre/mood input.
+
+    Flow:
+    1. Validate input (Pydantic)
+    2. Generate music JSON with OpenAI
+    3. Convert JSON → MIDI
+    4. Convert MIDI → WAV
+    5. Convert WAV → MP3
+    6. Return MP3 file
+    7. Cleanup temp files in background
+
+    Args:
+        request: GenerateRequest with genre, mood, tempo (optional), bars
+        background_tasks: FastAPI background tasks for cleanup
+
+    Returns:
+        FileResponse with MP3 audio file
+
+    Raises:
+        HTTPException: On any error during generation
+    """
+    # Generate unique ID for this request
+    request_id = str(uuid.uuid4())
+
+    # Ensure temp directory exists
+    os.makedirs(settings.TEMP_DIR, exist_ok=True)
+
+    # Define file paths
+    midi_path = os.path.join(settings.TEMP_DIR, f"{request_id}.mid")
+    wav_path = os.path.join(settings.TEMP_DIR, f"{request_id}.wav")
+    mp3_path = os.path.join(settings.TEMP_DIR, f"{request_id}.mp3")
+
+    try:
+        # Step 1: Generate music JSON with OpenAI
+        openai_service = OpenAIService()
+        music_data = await openai_service.generate_music_json(
+            genre=request.genre,
+            mood=request.mood,
+            tempo=request.tempo,
+            bars=request.bars
+        )
+
+        # Step 2: JSON → MIDI
+        midi_service = MidiService()
+        midi_service.convert_json_to_midi(music_data, midi_path)
+
+        # Step 3: MIDI → WAV
+        audio_service = AudioService()
+        audio_service.midi_to_wav(midi_path, wav_path)
+
+        # Step 4: WAV → MP3
+        audio_service.wav_to_mp3(wav_path, mp3_path)
+
+        # Step 5: Schedule cleanup in background
+        def cleanup():
+            """Delete temporary files after response is sent."""
+            for path in [midi_path, wav_path, mp3_path]:
+                if os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass  # Silent failure for cleanup
+
+        background_tasks.add_task(cleanup)
+
+        # Step 6: Return MP3 file
+        filename = f"beatcanvas_{request.genre}_{request.mood}_{request.bars}bars.mp3"
+        return FileResponse(
+            path=mp3_path,
+            media_type="audio/mpeg",
+            filename=filename,
+            headers={
+                "X-Tempo": str(music_data.metadata.tempo),
+                "X-Bars": str(music_data.metadata.bars),
+                "X-Key": music_data.metadata.key,
+                "X-Scale": music_data.metadata.scale
+            }
+        )
+
+    except Exception as e:
+        # Cleanup on error
+        for path in [midi_path, wav_path, mp3_path]:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+
+        # Determine appropriate error code
+        error_message = str(e)
+        if "OpenAI" in error_message or "API" in error_message:
+            status_code = 503  # Service Unavailable
+        elif "SoundFont" in error_message or "fluidsynth" in error_message:
+            status_code = 500  # Internal Server Error
+        else:
+            status_code = 500
+
+        raise HTTPException(
+            status_code=status_code,
+            detail=f"Music generation failed: {error_message}"
+        )
+
+
+@router.get("/health")
+async def health_check():
+    """
+    Health check endpoint.
+
+    Returns:
+        dict: Status information
+    """
+    return {
+        "status": "healthy",
+        "service": "BeatCanvas API",
+        "version": "1.0.0"
+    }
