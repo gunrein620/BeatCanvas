@@ -95,23 +95,37 @@ class PromptBuilder:
 
         prompt = f"""You are a music composition AI. Generate a {bars}-bar music loop in JSON format.
 
-**Requirements:**
+**CRITICAL REQUIREMENTS:**
 Genre: {genre}
 Mood: {mood}
-Bars: {bars} (equals {max_quarter_notes} quarter notes in 4/4 time)
+Bars: {bars} bars
 {tempo_instruction}
+
+**IMPORTANT - COMPOSITION LENGTH:**
+- You MUST create EXACTLY {bars} bars of music
+- In 4/4 time, {bars} bars = {max_quarter_notes} quarter notes total
+- Your notes MUST span from 0 to approximately {max_quarter_notes} quarter notes
+- DO NOT create just 2-4 bars when asked for {bars} bars
+- The music should loop seamlessly from 0 to {max_quarter_notes}
 
 **Musical Structure:**
 1. Create 3-4 instrument tracks:
    - drums (required): Use MIDI program 0, is_drum track
+     * Create a FULL drum pattern with kick (36), snare (38), and hi-hats (42)
+     * Include at least {bars * 8} drum notes total
    - bass (required): Use MIDI programs 32-39
+     * Include at least {bars * 2} bass notes
    - melody (required): Use MIDI programs 0-7 (piano), 24-31 (guitar), or 80-87 (synth leads)
+     * Include at least {bars * 4} melody notes
    - chords (optional): Use MIDI programs 0-7 (piano) or 48-55 (strings)
 
-2. Timing:
-   - All notes must have start_time between 0 and {max_quarter_notes} (quarter notes)
+2. Timing (CRITICAL):
+   - All notes must have start_time between 0 and {max_quarter_notes} quarter notes
+   - Distribute notes throughout the ENTIRE {max_quarter_notes} quarter note range
+   - Create patterns that repeat or develop across all {bars} bars
+   - For drums: create patterns that fill all {bars} bars (not just the first 2 bars)
+   - For bass/melody: create phrases that span the full {bars} bars
    - Align notes to reasonable rhythmic subdivisions (whole, half, quarter, eighth, sixteenth notes)
-   - Duration should be musically appropriate (not too long or too short)
 
 3. Genre Guidelines ({genre}):
    - {genre_info['description']}
@@ -123,6 +137,15 @@ Bars: {bars} (equals {max_quarter_notes} quarter notes in 4/4 time)
 5. Key and Scale:
    - Choose an appropriate key (C, D, E, F, G, A, B, with optional # or b)
    - Use major scale for uplifting moods, minor for melancholic moods
+
+6. Pattern Distribution Examples for {bars} bars:
+   - Drums: Create DENSE kick/snare/hi-hat patterns for all {bars} bars
+     * Include kick, snare, and hi-hats throughout the entire composition
+     * Hi-hats should appear on most eighth or sixteenth notes for rhythm
+     * Don't be sparse - drums should be present and audible throughout
+   - Bass: Create bass lines that progress from 0 to {max_quarter_notes} quarter notes
+   - Melody: Distribute melodic phrases across all {bars} bars, not just the first 2-4 bars
+   - Example: If generating {bars} bars, your last notes should be near {max_quarter_notes} quarter notes
 
 **MIDI Drum Map (pitch values):**
 - 36: Kick (bass drum)

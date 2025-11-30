@@ -56,6 +56,13 @@ async def generate_music(
 
     try:
         # Step 1: Generate music JSON with OpenAI
+        print(f"\n=== GENERATE REQUEST ===")
+        print(f"Genre: {request.genre}")
+        print(f"Mood: {request.mood}")
+        print(f"Tempo: {request.tempo}")
+        print(f"Bars: {request.bars}")
+        print(f"========================\n")
+
         openai_service = OpenAIService()
         music_data = await openai_service.generate_music_json(
             genre=request.genre,
@@ -63,6 +70,16 @@ async def generate_music(
             tempo=request.tempo,
             bars=request.bars
         )
+
+        print(f"\n=== GENERATED MUSIC DATA ===")
+        print(f"Tempo: {music_data.metadata.tempo}")
+        print(f"Bars: {music_data.metadata.bars}")
+        print(f"Key: {music_data.metadata.key} {music_data.metadata.scale}")
+        print(f"Tracks: {len(music_data.tracks)}")
+        for track in music_data.tracks:
+            max_time = max((note.start_time + note.duration for note in track.notes), default=0)
+            print(f"  - {track.name}: {len(track.notes)} notes, max_time: {max_time:.2f} quarter notes")
+        print(f"============================\n")
 
         # Step 2: JSON → MIDI
         midi_service = MidiService()

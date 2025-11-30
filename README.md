@@ -92,6 +92,13 @@ cd frontend
 npm install
 ```
 
+### 3. Root Setup (Quick Start용)
+
+```bash
+# 프로젝트 루트에서
+npm install
+```
+
 ## Configuration
 
 ### Backend (.env)
@@ -103,7 +110,20 @@ TEMP_DIR=./temp
 
 ## Running the Application
 
-### Start Backend
+### Quick Start (권장)
+프로젝트 루트에서 하나의 명령어로 frontend와 backend를 동시에 실행:
+
+```bash
+npm start
+```
+
+이렇게 하면:
+- Backend: `http://localhost:8000` (API Docs: `http://localhost:8000/docs`)
+- Frontend: `http://localhost:3000`
+
+### 개별 실행
+
+#### Start Backend
 ```bash
 cd backend
 source venv/bin/activate
@@ -114,7 +134,7 @@ Backend will be available at:
 - API: `http://localhost:8000`
 - Interactive Docs: `http://localhost:8000/docs`
 
-### Start Frontend
+#### Start Frontend
 ```bash
 cd frontend
 npm run dev

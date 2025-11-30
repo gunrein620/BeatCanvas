@@ -22,6 +22,13 @@ export default function Home() {
   } | null>(null)
 
   const handleGenerate = async (genre: string, mood: string, tempo?: number, bars: number = 8) => {
+    console.log('=== GENERATE REQUEST ===')
+    console.log('Genre:', genre)
+    console.log('Mood:', mood)
+    console.log('Tempo:', tempo)
+    console.log('Bars:', bars)
+    console.log('========================')
+
     setIsGenerating(true)
     setError(null)
     setAudioUrl(null)
@@ -34,6 +41,11 @@ export default function Home() {
         tempo,
         bars
       })
+
+      console.log('=== RECEIVED RESPONSE ===')
+      console.log('Metadata:', result.metadata)
+      console.log('Blob size:', result.blob.size)
+      console.log('=========================')
 
       const url = URL.createObjectURL(result.blob)
       const musicMetadata = {
