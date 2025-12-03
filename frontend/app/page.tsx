@@ -80,10 +80,10 @@ export default function Home() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
-            BeatCanvas
+            예술과 소프트웨어
           </h1>
           <p className="text-gray-400 text-lg">
-            AI-powered 8-bar music loop generator
+            AI-작곡 악상보조 프로그램
           </p>
         </div>
 
