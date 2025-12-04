@@ -75,26 +75,52 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
-      <div className="container mx-auto px-4 py-16 max-w-2xl">
+    <main className="min-h-screen bg-[var(--bg-cyber)] relative overflow-hidden">
+      {/* 애니메이션 그리드 배경 */}
+      <div className="absolute inset-0 opacity-20 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.1)_1px,transparent_1px)] bg-[size:50px_50px] animate-[grid-move_20s_linear_infinite]"></div>
+      </div>
+
+      {/* 스캔라인 효과 */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50 animate-[scanline_8s_linear_infinite]"></div>
+
+      {/* 파티클 시스템 (50개) */}
+      <div className="absolute inset-0 pointer-events-none">
+        {Array.from({ length: 50 }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-cyan-400 rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animation: `particle-float ${3 + Math.random() * 5}s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 5}s`,
+              opacity: 0.3 + Math.random() * 0.5
+            }}
+          />
+        ))}
+      </div>
+
+      {/* 기존 컨텐츠 */}
+      <div className="container mx-auto px-4 py-16 max-w-2xl relative z-10">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
+          <h1 className="text-6xl font-bold mb-4 text-gradient-cyber animate-float">
             예술과 소프트웨어
           </h1>
-          <p className="text-gray-400 text-lg">
+          <p className="text-cyan-100/80 text-lg tracking-wide animate-pulse-glow">
             AI-작곡 악상보조 프로그램
           </p>
         </div>
 
         {/* Form */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-gray-700 mb-8">
+        <div className="neo-card backdrop-blur-sm rounded-2xl p-8 border border-cyan-500/20 animate-border-glow mb-8 transition-all duration-300 hover:border-cyan-400/40 hover:scale-[1.01]">
           <PromptForm onSubmit={handleGenerate} isLoading={isGenerating} />
         </div>
 
         {/* Error Display */}
         {error && (
-          <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 mb-8">
+          <div className="neo-inset bg-red-900/30 border border-red-400/50 rounded-lg p-4 mb-8 backdrop-blur-sm animate-pulse">
             <p className="text-red-200 text-center">{error}</p>
           </div>
         )}
@@ -102,9 +128,9 @@ export default function Home() {
         {/* Loading State */}
         {isGenerating && (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500 mb-4"></div>
-            <p className="text-gray-400 text-lg">Generating your music...</p>
-            <p className="text-gray-500 text-sm mt-2">This may take 10-20 seconds</p>
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-400 mb-4 glow-intense"></div>
+            <p className="text-cyan-100/70 text-lg animate-pulse">Generating your music...</p>
+            <p className="text-cyan-200/50 text-sm mt-2 animate-pulse">This may take 10-20 seconds</p>
           </div>
         )}
 

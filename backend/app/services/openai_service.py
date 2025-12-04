@@ -112,7 +112,8 @@ class OpenAIService:
         genre: str,
         mood: str,
         tempo: Optional[int] = None,
-        bars: int = 8
+        bars: int = 8,
+        max_retries: int = 3
     ) -> MusicSchema:
         """
         Generate music JSON using OpenAI GPT-4 Turbo.
@@ -122,12 +123,13 @@ class OpenAIService:
             mood: Music mood (e.g., Happy, Sad, Energetic)
             tempo: Optional specific tempo (BPM)
             bars: Number of bars (4, 8, or 16)
+            max_retries: Maximum number of retry attempts (default: 3)
 
         Returns:
             MusicSchema object containing the generated composition
 
         Raises:
-            ValueError: If OpenAI returns invalid JSON
+            ValueError: If OpenAI returns invalid JSON after all retries
             Exception: If OpenAI API call fails
         """
         # Build the prompt
@@ -138,111 +140,147 @@ class OpenAIService:
             bars=bars
         )
 
-        try:
-            # Call OpenAI API with JSON mode
-            # Calculate max_tokens based on bars (more bars = more notes = more tokens needed)
-            # gpt-4-turbo-preview supports max 4096 completion tokens
-            max_tokens = min(3000 + (bars * 100), 4096)  # Scale with bars, cap at 4096
+        last_error = None
 
-            response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",  # GPT-4 Turbo
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a professional music composer AI that generates music compositions in JSON format. You output ONLY valid JSON with no additional text, comments, or explanations."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                response_format={"type": "json_object"},  # Enforce JSON output
-                temperature=0.8,  # Creative but not too random
-                max_tokens=max_tokens
-            )
-
-            # Extract JSON from response
-            json_str = response.choices[0].message.content
-
-            if not json_str:
-                raise ValueError("OpenAI returned empty response")
-
-            # Parse JSON
+        # Retry loop for handling occasional JSON parsing failures
+        for attempt in range(max_retries):
             try:
-                music_data = json.loads(json_str)
+                print(f"\n=== ATTEMPT {attempt + 1}/{max_retries} ===")
+
+                return await self._attempt_generation(prompt, bars)
+
             except json.JSONDecodeError as e:
-                print(f"\n!!! JSON PARSE ERROR !!!")
+                last_error = e
+                print(f"\n!!! JSON PARSE ERROR on attempt {attempt + 1}/{max_retries} !!!")
                 print(f"Error: {e}")
-                print(f"Response content (first 1000 chars):")
-                print(json_str[:1000])
-                print(f"\nResponse content (around error position):")
-                start = max(0, e.pos - 100)
-                end = min(len(json_str), e.pos + 100)
-                print(json_str[start:end])
-                print(f"\n!!!!!!!!!!!!!!!!!!!!!")
-                raise
 
-            # Validate against Pydantic schema
-            music_schema = MusicSchema(**music_data)
+                if attempt < max_retries - 1:
+                    print(f"Retrying... ({attempt + 2}/{max_retries})\n")
+                    continue
+                else:
+                    print(f"Max retries reached. Giving up.")
+                    raise ValueError(f"OpenAI returned invalid JSON after {max_retries} attempts: {str(e)}")
 
-            # Validate that music actually spans the requested bars
-            expected_quarter_notes = bars * 4
+            except Exception as e:
+                # Don't retry for non-JSON errors
+                raise Exception(f"OpenAI API error: {str(e)}")
 
-            # Check each track's length and note count
-            print(f"\n=== VALIDATING TRACK LENGTHS ===")
-            needs_extension = False
+        # Should never reach here, but just in case
+        raise ValueError(f"Failed to generate valid music JSON after {max_retries} attempts")
 
-            # Expected minimum notes per track
-            expected_notes = {
-                'drums': bars * 8,   # At least 8 notes per bar
-                'bass': bars * 2,    # At least 2 notes per bar
-                'melody': bars * 4,  # At least 4 notes per bar
-            }
+    async def _attempt_generation(self, prompt: str, bars: int) -> MusicSchema:
+        """
+        Single attempt at generating music JSON.
 
+        Args:
+            prompt: The generation prompt
+            bars: Number of bars
+
+        Returns:
+            MusicSchema object
+
+        Raises:
+            json.JSONDecodeError: If JSON parsing fails
+            Exception: If API call fails
+        """
+        # Call OpenAI API with JSON mode
+        # Optimized max_tokens calculation (reduced by ~32% from previous version)
+        # Previous: 3000 + bars*100. New: 2000 + bars*80 (more efficient)
+        max_tokens = min(2000 + (bars * 80), 3200)  # Conservative optimization
+
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",  # GPT-4o-mini (10x faster, 1/10 price)
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a professional music composer AI that generates music compositions in JSON format. You output ONLY valid JSON with no additional text, comments, or explanations."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            response_format={"type": "json_object"},  # Enforce JSON output
+            temperature=0.75,  # Improved genre differentiation (reduced from 0.8)
+            max_tokens=max_tokens
+        )
+
+        # Extract JSON from response
+        json_str = response.choices[0].message.content
+
+        # Log token usage for monitoring and optimization
+        usage = response.usage
+        efficiency = (usage.completion_tokens / max_tokens) * 100 if max_tokens > 0 else 0
+        print(f"\n=== TOKEN USAGE ===")
+        print(f"Prompt tokens: {usage.prompt_tokens}")
+        print(f"Completion tokens: {usage.completion_tokens}")
+        print(f"Total tokens: {usage.total_tokens}")
+        print(f"Max tokens allocated: {max_tokens}")
+        print(f"Efficiency: {efficiency:.1f}% (completion/max)")
+        print(f"==================\n")
+
+        if not json_str:
+            raise ValueError("OpenAI returned empty response")
+
+        # Parse JSON
+        music_data = json.loads(json_str)
+
+        # Validate against Pydantic schema
+        music_schema = MusicSchema(**music_data)
+
+        # Validate that music actually spans the requested bars
+        expected_quarter_notes = bars * 4
+
+        # Check each track's length and note count
+        print(f"\n=== VALIDATING TRACK LENGTHS ===")
+        needs_extension = False
+
+        # Expected minimum notes per track
+        expected_notes = {
+            'drums': bars * 8,   # At least 8 notes per bar
+            'bass': bars * 2,    # At least 2 notes per bar
+            'melody': bars * 4,  # At least 4 notes per bar
+        }
+
+        for track in music_schema.tracks:
+            track_max = 0.0
+            for note in track.notes:
+                note_end = note.start_time + note.duration
+                if note_end > track_max:
+                    track_max = note_end
+
+            note_count = len(track.notes)
+            track_name_lower = track.name.lower()
+            expected = expected_notes.get(track_name_lower, bars * 2)
+
+            status = "✓" if note_count >= expected else "✗ TOO FEW"
+            print(f"  {track.name}: {note_count} notes (expected ≥{expected}) {status}, length: {track_max:.2f} quarter notes ({track_max/4:.2f} bars)")
+
+            # If any track is less than 75% of expected, needs extension
+            if track_max < expected_quarter_notes * 0.75:
+                needs_extension = True
+
+        # Auto-extend if any track is too short
+        if needs_extension:
+            print(f"\nWARNING: Some tracks are too short!")
+            print(f"  Requested: {bars} bars ({expected_quarter_notes} quarter notes)")
+            print(f"  Auto-extending by repeating patterns...\n")
+
+            # Extend the music by repeating the pattern
+            music_schema = self._extend_music_pattern(music_schema, 0, expected_quarter_notes)
+
+            # Verify extension worked
+            print(f"\n=== VERIFICATION AFTER EXTENSION ===")
             for track in music_schema.tracks:
                 track_max = 0.0
                 for note in track.notes:
                     note_end = note.start_time + note.duration
                     if note_end > track_max:
                         track_max = note_end
+                print(f"  {track.name}: {track_max:.2f} quarter notes ({track_max/4:.2f} bars)")
+            print(f"=================================\n")
 
-                note_count = len(track.notes)
-                track_name_lower = track.name.lower()
-                expected = expected_notes.get(track_name_lower, bars * 2)
-
-                status = "✓" if note_count >= expected else "✗ TOO FEW"
-                print(f"  {track.name}: {note_count} notes (expected ≥{expected}) {status}, length: {track_max:.2f} quarter notes ({track_max/4:.2f} bars)")
-
-                # If any track is less than 75% of expected, needs extension
-                if track_max < expected_quarter_notes * 0.75:
-                    needs_extension = True
-
-            # Auto-extend if any track is too short
-            if needs_extension:
-                print(f"\nWARNING: Some tracks are too short!")
-                print(f"  Requested: {bars} bars ({expected_quarter_notes} quarter notes)")
-                print(f"  Auto-extending by repeating patterns...\n")
-
-                # Extend the music by repeating the pattern
-                music_schema = self._extend_music_pattern(music_schema, 0, expected_quarter_notes)
-
-                # Verify extension worked
-                print(f"\n=== VERIFICATION AFTER EXTENSION ===")
-                for track in music_schema.tracks:
-                    track_max = 0.0
-                    for note in track.notes:
-                        note_end = note.start_time + note.duration
-                        if note_end > track_max:
-                            track_max = note_end
-                    print(f"  {track.name}: {track_max:.2f} quarter notes ({track_max/4:.2f} bars)")
-                print(f"=================================\n")
-
-            return music_schema
-
-        except json.JSONDecodeError as e:
-            raise ValueError(f"OpenAI returned invalid JSON: {str(e)}")
-        except Exception as e:
-            raise Exception(f"OpenAI API error: {str(e)}")
+        return music_schema
 
 
 # Example usage for testing

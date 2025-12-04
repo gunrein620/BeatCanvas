@@ -20,27 +20,42 @@ class PromptBuilder:
         "high_tom": 48
     }
 
-    # Genre-specific guidelines
+    # Genre-specific guidelines (expanded with harmonic progressions)
     GENRE_GUIDELINES = {
         "edm": {
             "tempo_range": "120-140",
-            "description": "Fast tempo, four-on-floor kick pattern, synth leads, energetic"
+            "harmonic_progressions": "I-V-vi-IV, I-vi-IV-V (pop progressions)",
+            "rhythm_pattern": "Four-on-floor kick, offbeat hi-hats, syncopated snare",
+            "instruments": "Synth lead (81-87), Bass synth (38-39), Pad (88-95)",
+            "characteristics": "Build-ups, drops, sidechain compression feel"
         },
-        "hip-hop": {
+        "hiphop": {
             "tempo_range": "80-100",
-            "description": "Medium tempo, heavy bass, syncopated hi-hats, laid-back groove"
+            "harmonic_progressions": "i-VI-III-VII (minor), i-iv-v (modal)",
+            "rhythm_pattern": "Boom-bap (kick-snare), syncopated hi-hats, trap rolls",
+            "instruments": "808 bass (38-39), Electric piano (4-5), Strings (48-51)",
+            "characteristics": "Heavy bass, sample-like repetition"
         },
         "jazz": {
             "tempo_range": "100-140",
-            "description": "Swing feel, walking bass, complex harmonies, improvisation"
+            "harmonic_progressions": "ii-V-I (Dm7-G7-Cmaj7), I-vi-ii-V turnaround, Use 7th chords",
+            "rhythm_pattern": "Swing feel, walking bass quarter notes, ride cymbal",
+            "instruments": "Piano (0-7), Upright bass (32-33), Brush drums",
+            "characteristics": "Complex voicings, syncopation, improvisation"
         },
         "rock": {
             "tempo_range": "110-130",
-            "description": "Steady drums, electric guitar/bass, driving energy"
+            "harmonic_progressions": "I-IV-V (power chords), I-V-vi-IV, vi-IV-I-V",
+            "rhythm_pattern": "Steady eighth notes, backbeat snare, crash on downbeats",
+            "instruments": "Distorted guitar (29-31), Electric bass (33-34), Rock drums",
+            "characteristics": "Power chords, driving rhythm, strong accents"
         },
         "ambient": {
             "tempo_range": "60-90",
-            "description": "Slow tempo, sustained pads, minimal drums, atmospheric"
+            "harmonic_progressions": "Modal (static harmony), I-IV drone, Add9/sus2/sus4",
+            "rhythm_pattern": "Minimal drums, long sustained notes",
+            "instruments": "Pad (88-95), Strings (48-51), Bells/Chimes (8-15)",
+            "characteristics": "Atmospheric, spacious, no clear downbeat"
         }
     }
 
@@ -78,7 +93,10 @@ class PromptBuilder:
         # Get genre-specific guidelines
         genre_info = PromptBuilder.GENRE_GUIDELINES.get(genre_key, {
             "tempo_range": "90-130",
-            "description": "General music style"
+            "harmonic_progressions": "I-IV-V-I (basic progression)",
+            "rhythm_pattern": "Standard rhythm pattern",
+            "instruments": "General MIDI instruments",
+            "characteristics": "General music style"
         })
 
         # Get mood-specific guidelines
@@ -93,117 +111,42 @@ class PromptBuilder:
         else:
             tempo_instruction = f"Choose an appropriate tempo in the range {genre_info['tempo_range']} BPM based on the genre."
 
-        prompt = f"""You are a music composition AI. Generate a {bars}-bar music loop in JSON format.
+        prompt = f"""Generate {bars}-bar {genre} music in JSON format.
 
-**CRITICAL REQUIREMENTS:**
-Genre: {genre}
-Mood: {mood}
-Bars: {bars} bars
-{tempo_instruction}
+**REQUIREMENTS:**
+Genre: {genre} | Mood: {mood} | Tempo: {tempo_instruction} | Bars: {bars} ({max_quarter_notes} quarter notes in 4/4)
 
-**IMPORTANT - COMPOSITION LENGTH:**
-- You MUST create EXACTLY {bars} bars of music
-- In 4/4 time, {bars} bars = {max_quarter_notes} quarter notes total
-- Your notes MUST span from 0 to approximately {max_quarter_notes} quarter notes
-- DO NOT create just 2-4 bars when asked for {bars} bars
-- The music should loop seamlessly from 0 to {max_quarter_notes}
+**HARMONIC PROGRESSION (CRITICAL):**
+Style: {genre_info['harmonic_progressions']}
+- Use ii-V-I progressions (Dm7→G7→Cmaj7 in C major) for sophistication
+- Apply secondary dominants: V/V (D7→G7), V/vi (E7→Am) for variety
+- Bass notes MUST outline chord roots and change every 2-4 bars
+- Melody emphasizes chord tones (1, 3, 5, 7) with passing tones for movement
 
-**Musical Structure:**
-1. Create 3-4 instrument tracks:
-   - drums (required): Use MIDI program 0, is_drum track
-     * Create a FULL drum pattern with kick (36), snare (38), and hi-hats (42)
-     * Include at least {bars * 8} drum notes total
-   - bass (required): Use MIDI programs 32-39
-     * Include at least {bars * 2} bass notes
-   - melody (required): Use MIDI programs 0-7 (piano), 24-31 (guitar), or 80-87 (synth leads)
-     * Include at least {bars * 4} melody notes
-   - chords (optional): Use MIDI programs 0-7 (piano) or 48-55 (strings)
+**RHYTHM & STYLE:**
+Pattern: {genre_info['rhythm_pattern']}
+Instruments: {genre_info['instruments']}
+Character: {genre_info['characteristics']}
+Mood: {mood_info}
 
-2. Timing (CRITICAL):
-   - All notes must have start_time between 0 and {max_quarter_notes} quarter notes
-   - Distribute notes throughout the ENTIRE {max_quarter_notes} quarter note range
-   - Create patterns that repeat or develop across all {bars} bars
-   - For drums: create patterns that fill all {bars} bars (not just the first 2 bars)
-   - For bass/melody: create phrases that span the full {bars} bars
-   - Align notes to reasonable rhythmic subdivisions (whole, half, quarter, eighth, sixteenth notes)
+**TRACKS (3-4 required):**
+1. drums (program 0): {bars*8}+ notes. MIDI: 36=Kick 38=Snare 42=HH 49=Crash
+2. bass (32-39): {bars*2}+ notes, outline chord roots
+3. melody (0-7/24-31/80-87): {bars*4}+ notes, emphasize chord tones
+4. chords (0-7/48-55): optional harmony
 
-3. Genre Guidelines ({genre}):
-   - {genre_info['description']}
-   - Tempo range: {genre_info['tempo_range']} BPM
+**COMPOSITION RULES:**
+- Distribute notes evenly across 0-{max_quarter_notes} quarter notes (FULL {bars} bars)
+- Change harmony every 2-4 bars for interest
+- Align to rhythmic grid (quarter/eighth/sixteenth notes)
+- Key: Choose appropriate key. Scale: major (uplifting) or minor (melancholic)
+- Velocities: 0-127 for dynamics
 
-4. Mood Guidelines ({mood}):
-   - {mood_info}
+**OUTPUT (JSON only, no text):**
+{{"metadata":{{"tempo":<60-200>,"bars":{bars},"time_signature":[4,4],"key":"<C-B with #/b>","scale":"major/minor"}},
+"tracks":[{{"name":"drums","instrument":"drums","midi_program":0,"notes":[{{"pitch":<0-127>,"start_time":<0-{max_quarter_notes}>,"duration":<float>,"velocity":<0-127>}}]}},{{"name":"bass","instrument":"<bass>","midi_program":<32-39>,"notes":[...]}},{{"name":"melody","instrument":"<instrument>","midi_program":<int>,"notes":[...]}}]}}
 
-5. Key and Scale:
-   - Choose an appropriate key (C, D, E, F, G, A, B, with optional # or b)
-   - Use major scale for uplifting moods, minor for melancholic moods
-
-6. Pattern Distribution Examples for {bars} bars:
-   - Drums: Create DENSE kick/snare/hi-hat patterns for all {bars} bars
-     * Include kick, snare, and hi-hats throughout the entire composition
-     * Hi-hats should appear on most eighth or sixteenth notes for rhythm
-     * Don't be sparse - drums should be present and audible throughout
-   - Bass: Create bass lines that progress from 0 to {max_quarter_notes} quarter notes
-   - Melody: Distribute melodic phrases across all {bars} bars, not just the first 2-4 bars
-   - Example: If generating {bars} bars, your last notes should be near {max_quarter_notes} quarter notes
-
-**MIDI Drum Map (pitch values):**
-- 36: Kick (bass drum)
-- 38: Snare
-- 42: Closed hi-hat
-- 46: Open hi-hat
-- 49: Crash cymbal
-- 51: Ride cymbal
-- 41, 43, 45: Toms (low to high)
-- 48, 50: Toms (mid to high)
-
-**Musical Coherence:**
-- Create rhythmically aligned patterns that loop seamlessly
-- Use appropriate note velocities (0-127) for dynamics
-- Ensure bass and melody complement each other harmonically
-- Make drums provide a solid rhythmic foundation
-
-**Output Format:**
-Return ONLY valid JSON with this exact structure (no additional text):
-
-{{
-  "metadata": {{
-    "tempo": <integer 60-200>,
-    "bars": {bars},
-    "time_signature": [4, 4],
-    "key": "<string>",
-    "scale": "<major or minor>"
-  }},
-  "tracks": [
-    {{
-      "name": "drums",
-      "instrument": "drums",
-      "midi_program": 0,
-      "notes": [
-        {{
-          "pitch": <integer 0-127>,
-          "start_time": <float 0-{max_quarter_notes}>,
-          "duration": <float>,
-          "velocity": <integer 0-127>
-        }}
-      ]
-    }},
-    {{
-      "name": "bass",
-      "instrument": "<bass instrument>",
-      "midi_program": <integer 32-39>,
-      "notes": [...]
-    }},
-    {{
-      "name": "melody",
-      "instrument": "<melodic instrument>",
-      "midi_program": <integer>,
-      "notes": [...]
-    }}
-  ]
-}}
-
-Generate musically coherent, genre-appropriate, and mood-fitting composition. Output valid JSON only."""
+Generate musically coherent, genre-appropriate composition."""
 
         return prompt
 

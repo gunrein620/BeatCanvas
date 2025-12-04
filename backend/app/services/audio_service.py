@@ -31,13 +31,16 @@ class AudioService:
         if not os.path.exists(settings.SOUNDFONT_PATH):
             raise FileNotFoundError(f"SoundFont file not found: {settings.SOUNDFONT_PATH}")
 
-        # Build fluidsynth command
-        # Correct order: fluidsynth -ni -F output.wav -r 44100 soundfont.sf2 input.mid
+        # Build fluidsynth command (OPTIMIZED for speed)
+        # Correct order: fluidsynth -ni -F output.wav -r 22050 soundfont.sf2 input.mid
         cmd = [
             "fluidsynth",
             "-ni",                          # Non-interactive mode
             "-F", wav_path,                 # Output WAV file
-            "-r", "44100",                  # Sample rate (44.1kHz)
+            "-r", "22050",                  # Sample rate (22.05kHz - 2x faster than 44.1kHz)
+            "-o", "synth.reverb.active=no", # Disable reverb for speed
+            "-o", "synth.chorus.active=no", # Disable chorus for speed
+            "-g", "1.0",                    # Gain (1.0 = normal volume)
             settings.SOUNDFONT_PATH,        # SoundFont file
             midi_path                       # Input MIDI file
         ]

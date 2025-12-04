@@ -4,6 +4,7 @@ API endpoints for BeatCanvas music generation.
 
 import os
 import uuid
+import time
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from app.models import GenerateRequest
@@ -55,6 +56,8 @@ async def generate_music(
     mp3_path = os.path.join(settings.TEMP_DIR, f"{request_id}.mp3")
 
     try:
+        total_start = time.time()
+
         # Step 1: Generate music JSON with OpenAI
         print(f"\n=== GENERATE REQUEST ===")
         print(f"Genre: {request.genre}")
@@ -63,6 +66,7 @@ async def generate_music(
         print(f"Bars: {request.bars}")
         print(f"========================\n")
 
+        step1_start = time.time()
         openai_service = OpenAIService()
         music_data = await openai_service.generate_music_json(
             genre=request.genre,
@@ -70,6 +74,7 @@ async def generate_music(
             tempo=request.tempo,
             bars=request.bars
         )
+        step1_time = time.time() - step1_start
 
         print(f"\n=== GENERATED MUSIC DATA ===")
         print(f"Tempo: {music_data.metadata.tempo}")
@@ -82,15 +87,32 @@ async def generate_music(
         print(f"============================\n")
 
         # Step 2: JSON → MIDI
+        step2_start = time.time()
         midi_service = MidiService()
         midi_service.convert_json_to_midi(music_data, midi_path)
+        step2_time = time.time() - step2_start
 
         # Step 3: MIDI → WAV
+        step3_start = time.time()
         audio_service = AudioService()
         audio_service.midi_to_wav(midi_path, wav_path)
+        step3_time = time.time() - step3_start
 
         # Step 4: WAV → MP3
+        step4_start = time.time()
         audio_service.wav_to_mp3(wav_path, mp3_path)
+        step4_time = time.time() - step4_start
+
+        total_time = time.time() - total_start
+
+        # Print timing breakdown
+        print(f"\n=== PERFORMANCE BREAKDOWN ===")
+        print(f"Step 1 (OpenAI API):  {step1_time:.2f}s ({step1_time/total_time*100:.1f}%)")
+        print(f"Step 2 (JSON→MIDI):   {step2_time:.2f}s ({step2_time/total_time*100:.1f}%)")
+        print(f"Step 3 (MIDI→WAV):    {step3_time:.2f}s ({step3_time/total_time*100:.1f}%) ← BOTTLENECK?")
+        print(f"Step 4 (WAV→MP3):     {step4_time:.2f}s ({step4_time/total_time*100:.1f}%)")
+        print(f"TOTAL TIME:           {total_time:.2f}s")
+        print(f"============================\n")
 
         # Step 5: Schedule cleanup in background
         def cleanup():
